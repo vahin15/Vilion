@@ -1,0 +1,6 @@
+{
+  "appId": "com.velion.app",
+  "appName": "Velion",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}

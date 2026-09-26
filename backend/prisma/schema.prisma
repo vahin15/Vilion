@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CLIENT
+  WORKER
+  BOTH
+}
+
+enum JobStatus {
+  OPEN
+  ASSIGNED
+  TOKEN_PAID
+  IN_PROGRESS
+  DELIVERED
+  COMPLETED
+  DISPUTED
+  CANCELLED
+}
+
+enum PaymentStage {
+  TOKEN
+  FINAL
+}
+
+model User {
+  id            String   @id @default(uuid())
+  name          String
+  email         String   @unique
+  passwordHash  String
+  role          Role     @default(BOTH)
+  dpUrl         String?
+  description   String?  // worker bio / skills blurb
+  hourlyOrJobRate String?
+  createdAt     DateTime @default(now())
+
+  jobsPosted    Job[]    @relation("ClientJobs")
+  jobsWorking   Job[]    @relation("WorkerJobs")
+  sentMessages     Message[] @relation("Sender")
+  receivedMessages Message[] @relation("Receiver")
+}
+
+model Job {
+  id           String    @id @default(uuid())
+  title        String
+  description  String
+  price        Int       // total agreed amount in INR (paise not used, keep it simple: whole rupees)
+  status       JobStatus @default(OPEN)
+
+  client       User      @relation("ClientJobs", fields: [clientId], references: [id])
+  clientId     String
+
+  worker       User?     @relation("WorkerJobs", fields: [workerId], references: [id])
+  workerId     String?
+  workerRazorpayAccountId String? // set once worker completes Razorpay Route onboarding
+
+  payments     Payment[]
+  messages     Message[]
+
+  createdAt    DateTime  @default(now())
+}
+
+model Payment {
+  id             String       @id @default(uuid())
+  job            Job          @relation(fields: [jobId], references: [id])
+  jobId          String
+  stage          PaymentStage
+  amount         Int          // amount paid at this stage (token=50, final=price-50)
+  platformFee    Int          // 30 flat, only charged once (on final stage)
+  razorpayOrderId String?
+  razorpayPaymentId String?
+  status         String       @default("CREATED") // CREATED | PAID | FAILED
+  createdAt      DateTime     @default(now())
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  job        Job      @relation(fields: [jobId], references: [id])
+  jobId      String
+  sender     User     @relation("Sender", fields: [senderId], references: [id])
+  senderId   String
+  receiver   User     @relation("Receiver", fields: [receiverId], references: [id])
+  receiverId String
+  text       String
+  createdAt  DateTime @default(now())
+}
